@@ -1,9 +1,9 @@
 var mapData, canvas, ctx;
 var dragStart,dragged;
 var mousePos = {x:0,y:0};
-var zoomLevel = 1;
-var initialPlanetRadius = 4
-var planetRadius = initialPlanetRadius;
+var zoomLevel = 0.5;
+var initialPlanetRadius = 2
+var planetRadius = initialPlanetRadius / zoomLevel;
 var selectedPlanet = {};
 
 $(document).ready(function(){
@@ -18,6 +18,10 @@ $(document).ready(function(){
     responsiveCanvas();
 
 	getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
+
+    //Initial viewport
+	ctx.translate(canvas.width / 2,canvas.height / 2);
+	ctx.scale(zoomLevel,zoomLevel);
 
     var lastX=canvas.width/2, lastY=canvas.height/2;
 
@@ -164,6 +168,7 @@ function trackTransforms(ctx){
 var getMapData = function(url) {
 	$.get( url, function( data ) {
 		mapData = data;
+		$('#date').text('Generated: ' + data.generated);
 		redraw();
 	});
 }
