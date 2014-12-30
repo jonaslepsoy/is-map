@@ -1,0 +1,24 @@
+extends layout
+
+block content
+	div.row
+		div.col-xs-12.header
+			h1= title
+			p Welcome to #{title}
+	div.row
+		article.col-xs-12.col-md-8.main
+			canvas#map
+		aside.col-md-4.sidebar
+			div
+				h2#planetname
+				div
+					| Defense level:
+					span#planetdefenselevel
+				div
+					h3 Owner
+					img#planetownerimage.factionicon
+					div#planetowner
+				div
+					h3 Invader
+					img#planetinvaderimage.factionicon
+					div#planetinvader
