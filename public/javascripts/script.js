@@ -299,5 +299,4 @@ function showDetails (planet){
 	$('#planetownerimage').attr('src',planet.owner.icon);
 	$('#planetinvader').text(planet.invading.name);
 	$('#planetinvaderimage').attr('src',planet.invading.icon);
-	$('#planetdefenselevel').text(planet.defense_level);
 }
