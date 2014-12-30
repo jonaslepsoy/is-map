@@ -91,10 +91,10 @@ function redraw(){
     	drawMap();
     }    
 
-    ctx.save();
+    /*ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     writeMousePosition();
-    ctx.restore();
+    ctx.restore();*/
 }
 
 // Adds ctx.getTransform() - returns an SVGMatrix
@@ -286,7 +286,11 @@ function pointInCircle(point, shape) {
 
 function showDetails (planet){
 	$('#planetname').text(planet.name);
-	$('#planetowner').text(planet.owner.name);
+	var owner = planet.owner.name;
+	if(planet.unit.name !== '') {
+		owner += ': ' + planet.unit.name;
+	}
+	$('#planetowner').text(owner);
 	$('#planetownerimage').attr('src',planet.owner.icon);
 	$('#planetinvader').text(planet.invading.name);
 	$('#planetinvaderimage').attr('src',planet.invading.icon);
