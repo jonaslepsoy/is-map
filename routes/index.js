@@ -3,7 +3,7 @@ var router = express.Router();
 
 /* GET home page. */
 router.get('/', function(req, res) {
-  res.render('index', { title: 'Inner Sphere map' });
+  res.render('index', { title: 'Inner Sphere map', analytics: {trackingId: 'UA-58114935-1' }});
 });
 
 module.exports = router;
