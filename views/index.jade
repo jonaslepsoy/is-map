@@ -3,19 +3,32 @@ extends layout
 block content
 	div.row
 		div.col-xs-12.header
-			h1= title
+			h1
+				= title
+				| 
+				span.label.label-info Beta
 	div.row
 		article.col-xs-12.col-md-8.main
 			canvas#map
+			img.loading-animation(src='images/loading.gif')
 			div#date
 		aside.col-md-4.sidebar
-			div
-				h2#planetname
-				div.col-xs-12
-					h3 Owner
-					img#planetownerimage.factionicon.col-xs-4
-					div#planetowner.col-xs-8
-				div.col-xs-12
-					h3 Invader
-					img#planetinvaderimage.factionicon.col-xs-4
-					div#planetinvader.col-xs-8
+			div.panel.panel-default
+				div.panel-heading
+					h3.panel-title#planetname
+				div.panel-body
+					div.col-xs-12
+						img#planetownerimage.factionicon.col-xs-4
+						div.col-xs-8
+							| Owner: 
+							span#planetowner
+							div#planetownerunit
+					hr.planetdivider.col-xs-12
+					div.col-xs-12
+						img#planetinvaderimage.factionicon.col-xs-4
+						div.col-xs-8
+							| Invader: 
+							span#planetinvader
+							div
+								| Territories taken: 
+								span#planetinvaderterritoriesowned

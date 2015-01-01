@@ -2,6 +2,7 @@ var mapData, canvas, ctx;
 var dragStart,dragged;
 var mousePos = {x:0,y:0};
 var zoomLevel = 0.5;
+var fontSize = 2;
 var initialPlanetRadius = 2
 var planetRadius = initialPlanetRadius / zoomLevel;
 var selectedPlanet = {};
@@ -34,16 +35,18 @@ $(document).ready(function(){
     },false);
 
     canvas.addEventListener('mousemove',function(evt){
-        getMousePos(canvas,evt);
-        redraw();
-        lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
-        lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
-        dragged = true;
-        if (dragStart){
-            var pt = ctx.transformedPoint(lastX,lastY);
-            ctx.translate(pt.x-dragStart.x,pt.y-dragStart.y);
-            redraw();
-        }
+        if(mapData) {
+        	getMousePos(canvas,evt);
+	        redraw();
+	        lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
+	        lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
+	        dragged = true;
+	        if (dragStart){
+	            var pt = ctx.transformedPoint(lastX,lastY);
+	            ctx.translate(pt.x-dragStart.x,pt.y-dragStart.y);
+	            redraw();
+	        }
+	    }
     },false);
 
     canvas.addEventListener('mouseup',function(evt){
@@ -70,7 +73,11 @@ $(document).ready(function(){
 
     var handleScroll = function(evt){
         var delta = evt.wheelDelta ? evt.wheelDelta/40 : evt.detail ? -evt.detail : 0;
-        if (delta) zoom(delta);
+        if (delta){
+    		if(zoomLevel > 0.4 || delta > 0) {
+        		zoom(delta);
+        	}
+        } 
         return evt.preventDefault() && false;
     };
 
@@ -166,7 +173,9 @@ function trackTransforms(ctx){
 }
 
 var getMapData = function(url) {
+	$('.loading-animation').show();
 	$.get( url, function( data ) {
+		$('.loading-animation').hide();
 		mapData = data;
 		$('#date').text('Generated: ' + data.generated);
 		redraw();
@@ -188,6 +197,39 @@ function responsiveCanvas(){
 }
 
 function drawMap() {
+	// create radial gradient
+	var gradient = ctx.createRadialGradient(238, 50, 10, 238, 50, 300);
+	// light blue
+	gradient.addColorStop(0, '#8ED6FF');
+	// dark blue
+	gradient.addColorStop(1, '#004CB3');
+	ctx.strokeStyle = gradient;
+	ctx.lineWidth = 1 / zoomLevel;
+
+	var items = 20;
+	var x0 = 0;
+	var y0 = 0;
+	var r = 2600;
+
+	for(var i = 0; i < items; i++) {
+    	var x1 = x0 + r * Math.cos(2 * Math.PI * i / items);
+    	var y1 = y0 + r * Math.sin(2 * Math.PI * i / items);
+    	var x2 = x0 + r * Math.cos(2 * Math.PI * (i + items / 2) / items);
+   		var y2 = y0 + r * Math.sin(2 * Math.PI * (i + items / 2) / items);
+		ctx.beginPath();
+		ctx.moveTo(x1,y1);
+		ctx.lineTo(x2,y2);
+		ctx.stroke();
+		ctx.closePath();
+	}
+
+	for (var r = 200; r <= 2000; r+=200) {
+		ctx.beginPath();
+		ctx.arc(0, 0, r, 0, 2 * Math.PI, false);
+		ctx.stroke();
+		ctx.closePath();
+	}
+	
 	$.each(mapData, function(){
 		if(this.position && this.position.x && this.position.y) {
 			ctx.beginPath();
@@ -195,7 +237,9 @@ function drawMap() {
 			ctx.fillStyle = getFactionColor(this);
 			ctx.fill();
 			ctx.closePath();
+			
 			if(this.selected) {
+				console.log(this.name , '(' + this.position.x + ',' + this.position.y + ')');
 				ctx.beginPath();
 				ctx.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
 				ctx.strokeStyle = 'cyan';
@@ -210,7 +254,36 @@ function drawMap() {
 				ctx.lineWidth = 4;
 	      		ctx.stroke();
 	      		ctx.closePath();
-      		}
+      		}/* else if(this.unit.id != 0) { // This planet is owned by a player unit.
+      			ctx.beginPath();
+				ctx.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
+				ctx.strokeStyle = getFactionColor(this);
+				ctx.lineWidth = 4;
+	      		ctx.stroke();
+	      		ctx.closePath();
+      		}*/
+		}
+	});
+	ctx.font = (fontSize).toFixed(0) + 'px sans-serif';
+    ctx.fillStyle = 'white';
+    ctx.strokeStyle = 'black';
+	ctx.lineWidth = 0.2;
+	$.each(mapData, function(){
+		if(zoomLevel > 5 && this.position && this.position.x && this.position.y){
+	        if(this.selected) {
+	        	ctx.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
+	        }
+	        var planetText = this.name;
+	        if(this.unit.name!==''){
+        		planetText += ' (' + this.unit.name + ')';
+	        }
+	        ctx.save();
+			ctx.strokeText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
+			ctx.fillText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
+	        ctx.restore();
+		    if(this.selected) {
+	        	ctx.font = (fontSize).toFixed(0) + 'px sans-serif';
+	        }
 		}
 	});
 }
@@ -258,13 +331,11 @@ function getFactionColor(faction) {
 }
 
 function trackHoverPlanet(mousePos) {
-    var shape;
     $.each(mapData, function(){
         if(this.position && this.position.x && this.position.y) {
-	        shape = this;
-	        if (pointInCircle(mousePos, shape)) {
-	            shape.selected = true;
-	            //console.log('Mousing over ' + this.name);
+	        if (pointInCircle(mousePos, this)) {
+	        	//TODO: Replace with get closest planet that also is in circle so we avoid double hits.
+	            this.selected = true;
 	            if(selectedPlanet.name) {
 	            	if(selectedPlanet.name !== this.name){
 						selectedPlanet = this;
@@ -276,27 +347,42 @@ function trackHoverPlanet(mousePos) {
 				}
 	            return;
 	        } else {
-	        	shape.selected = false;
+	        	this.selected = false;
 	        }
 	    }
     });
 }
 
 function pointInCircle(point, shape) {
+	//Is some point within some radius?
     var distX = Math.abs(point.x - shape.position.x),
-        distY = Math.abs(point.y - -shape.position.y),
+        distY = Math.abs(point.y - -shape.position.y), // Coordinates are y-inverted on a canvas, so we multiply all values in the y-axis with -1
         dist = Math.sqrt(distX * distX + distY * distY);
-    return dist < planetRadius;
+    return dist < planetRadius * 2;
 }
 
 function showDetails (planet){
-	$('#planetname').text(planet.name);
+	// TODO: Replace with Angular or something like it. This is really rudimentary stuff, just to get something on screen...
 	var owner = planet.owner.name;
-	if(planet.unit.name !== '') {
-		owner += ': ' + planet.unit.name;
-	}
+	$('#planetname').text(planet.name);
 	$('#planetowner').text(owner);
+	if(planet.unit.name !== '') {
+		owner = 'Unit: ' + planet.unit.name;
+	} else owner = '';
+	$('#planetownerunit').text(owner);
 	$('#planetownerimage').attr('src',planet.owner.icon);
 	$('#planetinvader').text(planet.invading.name);
 	$('#planetinvaderimage').attr('src',planet.invading.icon);
+	if(planet.contested != 0) {
+		// Calculate how many territories have been taken. Thanks to iamatotalnoob on Reddit (http://www.reddit.com/u/iamatotalnoob) for the algorithm
+		var sum = 0;
+		for (var t = 0; t < 8; t++) {
+			var territory = planet.territories[t];
+			for (var i = 0; i < 8; i++) {
+				sum += (0x1 & territory);
+				territory = territory >> 1;
+			}
+		}
+	}
+	$('#planetinvaderterritoriesowned').text(sum);
 }
