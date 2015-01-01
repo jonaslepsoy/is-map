@@ -6,23 +6,32 @@ var fontSize = 2;
 var initialPlanetRadius = 2
 var planetRadius = initialPlanetRadius / zoomLevel;
 var selectedPlanet = {};
+var offscreen_canvas, offscreen_context;
 
 $(document).ready(function(){
 	
 	canvas = document.getElementById('map');
 	ctx = canvas.getContext('2d');
+	responsiveCanvas();
+	offscreen_canvas = document.createElement('canvas');
+	offscreen_canvas.width = canvas.width;
+	offscreen_canvas.height = canvas.height;
+	offscreen_context = offscreen_canvas.getContext('2d');
 
-	$(window).resize( responsiveCanvas );
+	$(window).resize( function () {
+		responsiveCanvas();
+		offscreen_canvas.width = canvas.width;
+		offscreen_canvas.height = canvas.height;
+	});
 
 	trackTransforms(ctx);
-
-    responsiveCanvas();
+	trackTransforms(offscreen_context);
 
 	getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
 
     //Initial viewport
-	ctx.translate(canvas.width / 2,canvas.height / 2);
-	ctx.scale(zoomLevel,zoomLevel);
+	offscreen_context.translate(canvas.width / 2,canvas.height / 2);
+	offscreen_context.scale(zoomLevel,zoomLevel);
 
     var lastX=canvas.width/2, lastY=canvas.height/2;
 
@@ -30,20 +39,21 @@ $(document).ready(function(){
         document.body.style.mozUserSelect = document.body.style.webkitUserSelect = document.body.style.userSelect = 'none';
         lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
         lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
-        dragStart = ctx.transformedPoint(lastX,lastY);
+        dragStart = offscreen_context.transformedPoint(lastX,lastY);
         dragged = false;
     },false);
 
     canvas.addEventListener('mousemove',function(evt){
         if(mapData) {
-        	getMousePos(canvas,evt);
-	        redraw();
+        	if(getMousePos(canvas,evt)) {
+        		redraw(); // Only redraw if needed (User is mousing over a planet)
+        	};
 	        lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
 	        lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
 	        dragged = true;
 	        if (dragStart){
-	            var pt = ctx.transformedPoint(lastX,lastY);
-	            ctx.translate(pt.x-dragStart.x,pt.y-dragStart.y);
+	            var pt = offscreen_context.transformedPoint(lastX,lastY);
+	            offscreen_context.translate(pt.x-dragStart.x,pt.y-dragStart.y);
 	            redraw();
 	        }
 	    }
@@ -57,17 +67,17 @@ $(document).ready(function(){
     var scaleFactor = 1.1;
 
     var zoom = function(clicks){
-        var pt = ctx.transformedPoint(lastX,lastY);
-        ctx.translate(pt.x,pt.y);
+        var pt = offscreen_context.transformedPoint(lastX,lastY);
+        offscreen_context.translate(pt.x,pt.y);
         var factor = Math.pow(scaleFactor,clicks);
-        zoomLevel = ctx.getTransform().a;
+        zoomLevel = offscreen_context.getTransform().a;
         if(zoomLevel > 1) {
 			planetRadius = initialPlanetRadius;
 		} else {
 			planetRadius = initialPlanetRadius / zoomLevel;
 		}
-        ctx.scale(factor,factor);
-        ctx.translate(-pt.x,-pt.y);
+        offscreen_context.scale(factor,factor);
+        offscreen_context.translate(-pt.x,-pt.y);
         redraw();
     }
 
@@ -83,8 +93,8 @@ $(document).ready(function(){
 
     function getMousePos(canvas, evt) {
 		var rect = canvas.getBoundingClientRect();
-		mousePos = ctx.transformedPoint(evt.clientX - rect.left, evt.clientY - rect.top);
-		trackHoverPlanet(mousePos);
+		mousePos = offscreen_context.transformedPoint(evt.clientX - rect.left, evt.clientY - rect.top);
+		return trackHoverPlanet(mousePos);
 	}
 
     canvas.addEventListener('DOMMouseScroll',handleScroll,false);
@@ -97,15 +107,16 @@ function redraw(){
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.restore();
+    offscreen_context.save();
+    offscreen_context.setTransform(1,0,0,1,0,0);
+    offscreen_context.clearRect(0,0,offscreen_canvas.width,offscreen_canvas.height);
+    offscreen_context.restore();	
 
     if(mapData) {
-    	drawMap();
+    	drawMap(offscreen_context);
+    	ctx.drawImage(offscreen_canvas, 0, 0);
+    	//requestAnimationFrame(redraw); // Hooo, this uses some cycles! Let's develop some more before we optimize any more.
     }    
-
-    /*ctx.save();
-    ctx.setTransform(1,0,0,1,0,0);
-    writeMousePosition();
-    ctx.restore();*/
 }
 
 // Adds ctx.getTransform() - returns an SVGMatrix
@@ -178,6 +189,7 @@ var getMapData = function(url) {
 		$('.loading-animation').hide();
 		mapData = data;
 		$('#date').text('Generated: ' + data.generated);
+		$('#date').data('date', data.generated);
 		redraw();
 	});
 }
@@ -193,67 +205,58 @@ function writeMousePosition() {
 function responsiveCanvas(){ 
     $('#map').attr('width', $('#map').width() ); //max width
     $('#map').attr('height', $('#map').height() ); //max height
-    redraw();
 }
 
-function drawMap() {
-	// create radial gradient
-	var gradient = ctx.createRadialGradient(238, 50, 10, 238, 50, 300);
-	// light blue
-	gradient.addColorStop(0, '#8ED6FF');
-	// dark blue
+function drawMap(context) {
+	// Let's create a radial gradient for our lines and circles
+	var gradient = context.createRadialGradient(0, 0, 300, 0, 0, 600);
+	gradient.addColorStop(0, '#2E262F');
 	gradient.addColorStop(1, '#004CB3');
-	ctx.strokeStyle = gradient;
-	ctx.lineWidth = 1 / zoomLevel;
+	context.strokeStyle = gradient;
+	context.lineWidth = 1 / zoomLevel;
 
-	var items = 20;
-	var x0 = 0;
-	var y0 = 0;
-	var r = 2600;
+	var sectors = 20; // How many segments in our starmap
+	var r = 2600; // How far our should we draw the lines? TODO: Make'em go forever?
 
-	for(var i = 0; i < items; i++) {
-    	var x1 = x0 + r * Math.cos(2 * Math.PI * i / items);
-    	var y1 = y0 + r * Math.sin(2 * Math.PI * i / items);
-    	var x2 = x0 + r * Math.cos(2 * Math.PI * (i + items / 2) / items);
-   		var y2 = y0 + r * Math.sin(2 * Math.PI * (i + items / 2) / items);
-		ctx.beginPath();
-		ctx.moveTo(x1,y1);
-		ctx.lineTo(x2,y2);
-		ctx.stroke();
-		ctx.closePath();
+	context.beginPath();
+	for(var i = 1; i <= sectors; i++) {
+		// Draw some pretty lines. Doing it this way is more efficient than drawing all the lines from the edge of the circle, even though this method doubles the number of lines we draw.
+    	var x = r * Math.cos(2 * Math.PI * i / sectors);
+    	var y = r * Math.sin(2 * Math.PI * i / sectors);
+		context.moveTo(0,0);
+		context.lineTo(x,y);
 	}
-
 	for (var r = 200; r <= 2000; r+=200) {
-		ctx.beginPath();
-		ctx.arc(0, 0, r, 0, 2 * Math.PI, false);
-		ctx.stroke();
-		ctx.closePath();
+		// Draw some pretty circles		
+		context.arc(0, 0, r, 0, 2 * Math.PI, false);
 	}
+	context.stroke();
+	context.closePath();
+
 	
 	$.each(mapData, function(){
 		if(this.position && this.position.x && this.position.y) {
-			ctx.beginPath();
-			ctx.arc(this.position.x, -this.position.y, planetRadius, 0, 2 * Math.PI, false);
-			ctx.fillStyle = getFactionColor(this);
-			ctx.fill();
-			ctx.closePath();
+			context.beginPath();
+			context.arc(this.position.x, -this.position.y, planetRadius, 0, 2 * Math.PI, false);
+			context.fillStyle = getFactionColor(this);
+			context.fill();
+			context.closePath();
 			
 			if(this.selected) {
-				console.log(this.name , '(' + this.position.x + ',' + this.position.y + ')');
-				ctx.beginPath();
-				ctx.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
-				ctx.strokeStyle = 'cyan';
-				ctx.lineWidth = 4;
-				ctx.stroke();
-				ctx.closePath();
+				context.beginPath();
+				context.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
+				context.strokeStyle = 'cyan';
+				context.lineWidth = 4;
+				context.stroke();
+				context.closePath();
 			}
 			else if(this.contested != 0) {
-				ctx.beginPath();
-				ctx.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
-				ctx.strokeStyle = 'red';
-				ctx.lineWidth = 4;
-	      		ctx.stroke();
-	      		ctx.closePath();
+				context.beginPath();
+				context.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
+				context.strokeStyle = 'red';
+				context.lineWidth = 4;
+	      		context.stroke();
+	      		context.closePath();
       		}/* else if(this.unit.id != 0) { // This planet is owned by a player unit.
       			ctx.beginPath();
 				ctx.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
@@ -264,25 +267,25 @@ function drawMap() {
       		}*/
 		}
 	});
-	ctx.font = (fontSize).toFixed(0) + 'px sans-serif';
-    ctx.fillStyle = 'white';
-    ctx.strokeStyle = 'black';
-	ctx.lineWidth = 0.2;
+	context.font = (fontSize).toFixed(0) + 'px sans-serif';
+    context.fillStyle = 'white';
+    context.strokeStyle = 'black';
+	context.lineWidth = 0.2;
 	$.each(mapData, function(){
 		if(zoomLevel > 5 && this.position && this.position.x && this.position.y){
 	        if(this.selected) {
-	        	ctx.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
+	        	context.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
 	        }
 	        var planetText = this.name;
 	        if(this.unit.name!==''){
         		planetText += ' (' + this.unit.name + ')';
 	        }
-	        ctx.save();
-			ctx.strokeText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
-			ctx.fillText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
-	        ctx.restore();
+	        context.save();
+			context.strokeText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
+			context.fillText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
+	        context.restore();
 		    if(this.selected) {
-	        	ctx.font = (fontSize).toFixed(0) + 'px sans-serif';
+	        	context.font = (fontSize).toFixed(0) + 'px sans-serif';
 	        }
 		}
 	});
@@ -331,11 +334,13 @@ function getFactionColor(faction) {
 }
 
 function trackHoverPlanet(mousePos) {
+    var hoveringOverAPLanet = false;
     $.each(mapData, function(){
         if(this.position && this.position.x && this.position.y) {
 	        if (pointInCircle(mousePos, this)) {
 	        	//TODO: Replace with get closest planet that also is in circle so we avoid double hits.
 	            this.selected = true;
+	            hoveringOverAPLanet = true;
 	            if(selectedPlanet.name) {
 	            	if(selectedPlanet.name !== this.name){
 						selectedPlanet = this;
@@ -351,6 +356,7 @@ function trackHoverPlanet(mousePos) {
 	        }
 	    }
     });
+    return hoveringOverAPLanet;
 }
 
 function pointInCircle(point, shape) {
