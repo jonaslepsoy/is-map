@@ -94,6 +94,7 @@ $(document).ready(function(){
     function getMousePos(canvas, evt) {
 		var rect = canvas.getBoundingClientRect();
 		mousePos = offscreen_context.transformedPoint(evt.clientX - rect.left, evt.clientY - rect.top);
+		//console.log('mousePos',mousePos, rect.left, rect.offsetTop);
 		return trackHoverPlanet(mousePos);
 	}
 
@@ -233,9 +234,22 @@ function drawMap(context) {
 	context.stroke();
 	context.closePath();
 
+	var rect = canvas.getBoundingClientRect();
+	var topleft = offscreen_context.transformedPoint(0 - rect.left, 0 - rect.top);
+	var bottomright = ctx.transformedPoint(canvas.width, canvas.height);
+	/*console.log('topleft.y',topleft.y);
+	console.log('bottomright.y',bottomright.y);*/
 	
 	$.each(mapData, function(){
-		if(this.position && this.position.x && this.position.y) {
+		// First, let's draw all the planets inside the viewport
+		if(
+			this.position && 
+			this.position.x && 
+			this.position.y && 
+			this.position.x > topleft.x && 
+			this.position.x < bottomright.x && 
+			-this.position.y > topleft.y && 
+			-this.position.y < bottomright.y) {
 			context.beginPath();
 			context.arc(this.position.x, -this.position.y, planetRadius, 0, 2 * Math.PI, false);
 			context.fillStyle = getFactionColor(this);
@@ -265,6 +279,8 @@ function drawMap(context) {
 	      		ctx.stroke();
 	      		ctx.closePath();
       		}*/
+		} else if (this.name === 'Terra'){
+			console.log('not rendering Terra', this);
 		}
 	});
 	context.font = (fontSize).toFixed(0) + 'px sans-serif';
@@ -272,7 +288,15 @@ function drawMap(context) {
     context.strokeStyle = 'black';
 	context.lineWidth = 0.2;
 	$.each(mapData, function(){
-		if(zoomLevel > 5 && this.position && this.position.x && this.position.y){
+		// Then, let's draw all planet names inside the viewport
+		if(zoomLevel > 5 && 
+			this.position && 
+			this.position.x && 
+			this.position.y && 
+			this.position.x > parseInt(topleft.x) - 15 && 
+			this.position.x < bottomright.x && 
+			-this.position.y > topleft.y && 
+			-this.position.y < bottomright.y) {
 	        if(this.selected) {
 	        	context.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
 	        }
@@ -340,6 +364,7 @@ function trackHoverPlanet(mousePos) {
 	        if (pointInCircle(mousePos, this)) {
 	        	//TODO: Replace with get closest planet that also is in circle so we avoid double hits.
 	            this.selected = true;
+	            console.log(this.name + ' ('+this.position.x+','+this.position.y+')');
 	            hoveringOverAPLanet = true;
 	            if(selectedPlanet.name) {
 	            	if(selectedPlanet.name !== this.name){
@@ -378,7 +403,12 @@ function showDetails (planet){
 	$('#planetownerunit').text(owner);
 	$('#planetownerimage').attr('src',planet.owner.icon);
 	$('#planetinvader').text(planet.invading.name);
-	$('#planetinvaderimage').attr('src',planet.invading.icon);
+	if(planet.invading.icon) {
+		$('#planetinvaderimage').attr('src',planet.invading.icon);
+		$('#planetinvaderimage').show();
+	} else {
+		$('#planetinvaderimage').hide();
+	}
 	if(planet.contested != 0) {
 		// Calculate how many territories have been taken. Thanks to iamatotalnoob on Reddit (http://www.reddit.com/u/iamatotalnoob) for the algorithm
 		var sum = 0;
@@ -389,6 +419,9 @@ function showDetails (planet){
 				territory = territory >> 1;
 			}
 		}
+		$('#planetinvaderterritoriesowned').text(sum);
+	} else {
+		$('#planetinvaderterritoriesowned').text('0');
 	}
-	$('#planetinvaderterritoriesowned').text(sum);
+	
 }
