@@ -2,11 +2,18 @@ var mapData, canvas, ctx;
 var dragStart,dragged;
 var mousePos = {x:0,y:0};
 var zoomLevel = 0.5;
-var fontSize = 2;
-var initialPlanetRadius = 2
+var fontSize = 1.2;
+var initialPlanetRadius = 1
 var planetRadius = initialPlanetRadius / zoomLevel;
 var selectedPlanet = {};
 var offscreen_canvas, offscreen_context;
+var logo_canvas, logo_context;
+var sites = [];
+var cells = null;
+var bbox = {xl:-1000, xr:1000, yt:-1000, yb:1000};
+var logoSize = 64;
+var capitals = [];
+var treemap;
 
 $(document).ready(function(){
 	
@@ -27,11 +34,14 @@ $(document).ready(function(){
 	trackTransforms(ctx);
 	trackTransforms(offscreen_context);
 
-	getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
+	getMapData('json/mapdata.json');
+	//getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
 
     //Initial viewport
 	offscreen_context.translate(canvas.width / 2,canvas.height / 2);
 	offscreen_context.scale(zoomLevel,zoomLevel);
+
+	drawLines(offscreen_context);
 
     var lastX=canvas.width/2, lastY=canvas.height/2;
 
@@ -45,8 +55,10 @@ $(document).ready(function(){
 
     canvas.addEventListener('mousemove',function(evt){
         if(mapData) {
-        	if(getMousePos(canvas,evt)) {
-        		redraw(); // Only redraw if needed (User is mousing over a planet)
+			var hovercell = getMousePos(canvas,evt);
+        	if(hovercell) {
+				redraw(mapData); // Only redraw if needed (User is mousing over a planet)
+				showDetails(mapData.cells[hovercell].site.planet);
         	};
 	        lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
 	        lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
@@ -54,7 +66,7 @@ $(document).ready(function(){
 	        if (dragStart){
 	            var pt = offscreen_context.transformedPoint(lastX,lastY);
 	            offscreen_context.translate(pt.x-dragStart.x,pt.y-dragStart.y);
-	            redraw();
+	            redraw(mapData);
 	        }
 	    }
     },false);
@@ -78,7 +90,7 @@ $(document).ready(function(){
 		}
         offscreen_context.scale(factor,factor);
         offscreen_context.translate(-pt.x,-pt.y);
-        redraw();
+        redraw(mapData);
     }
 
     var handleScroll = function(evt){
@@ -94,7 +106,6 @@ $(document).ready(function(){
     function getMousePos(canvas, evt) {
 		var rect = canvas.getBoundingClientRect();
 		mousePos = offscreen_context.transformedPoint(evt.clientX - rect.left, evt.clientY - rect.top);
-		//console.log('mousePos',mousePos, rect.left, rect.offsetTop);
 		return trackHoverPlanet(mousePos);
 	}
 
@@ -102,7 +113,7 @@ $(document).ready(function(){
     canvas.addEventListener('mousewheel',handleScroll,false);
 })
 
-function redraw(){
+function redraw(mapData){
     // Clear the entire canvas
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
@@ -111,13 +122,15 @@ function redraw(){
     offscreen_context.save();
     offscreen_context.setTransform(1,0,0,1,0,0);
     offscreen_context.clearRect(0,0,offscreen_canvas.width,offscreen_canvas.height);
-    offscreen_context.restore();	
+    offscreen_context.restore();
+
+	drawLines(offscreen_context);
 
     if(mapData) {
-    	drawMap(offscreen_context);
+    	drawVoronoi(offscreen_context, mapData, sites);
     	ctx.drawImage(offscreen_canvas, 0, 0);
     	//requestAnimationFrame(redraw); // Hooo, this uses some cycles! Let's develop some more before we optimize any more.
-    }    
+    }
 }
 
 // Adds ctx.getTransform() - returns an SVGMatrix
@@ -186,21 +199,57 @@ function trackTransforms(ctx){
 
 var getMapData = function(url) {
 	$('.loading-animation').show();
-	$.get( url, function( data ) {
-		$('.loading-animation').hide();
-		mapData = data;
-		$('#date').text('Generated: ' + data.generated);
-		$('#date').data('date', data.generated);
-		redraw();
-	});
+
+	var xmlhttp;
+	if (window.XMLHttpRequest)
+	{// code for IE7+, Firefox, Chrome, Opera, Safari
+		xmlhttp=new XMLHttpRequest();
+	}
+	else
+	{// code for IE6, IE5
+		xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+	}
+
+	xmlhttp.onreadystatechange=function()
+	{
+		if (xmlhttp.readyState==4 && xmlhttp.status==200)
+		{
+			$('.loading-animation').hide();
+			mapData = jQuery.parseJSON(xmlhttp.responseText);
+			data = mapData;
+			$('#date').text('Generated: ' + data.generated);
+			$('#date').data('date', data.generated);
+			//Initialize data for our Voronoi diagram
+			sites = [];
+			$.each(mapData, function(){
+				if(this.position && this.position.x && this.position.y){
+					var site = {};
+					site.x = parseInt(this.position.x);
+					site.y = parseInt(this.position.y);
+					site.planet = this;
+					sites.push(site);
+				}
+				if(this.name==='Luthien' || this.name==='New Avalon' || this.name==='Atreus' || this.name==='Sian' || this.name==='Tharkad' || this.name==='Terra' || this.name==='Rasalhague' || this.name==='Richmond' || this.name==='Manaringaine' || this.name==='The Rock' || this.name==='Botany Bay'){
+					capitals.push(this);
+				}
+			});
+			var voronoi = new Voronoi();
+			mapData = voronoi.compute(sites, bbox);
+			cells = mapData.cells;
+			//console.log(cells[0]);
+			redraw(mapData);
+		}
+	}
+	xmlhttp.open("GET",url,true);
+	xmlhttp.send();
 }
 
 function writeMousePosition() {
-		var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y + ', zoom: ' + zoomLevel;
-        ctx.font = '12pt Calibri';
-        ctx.fillStyle = 'white';
-        ctx.fillText(message, 10, 25);
-    }
+	var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y + ', zoom: ' + zoomLevel;
+	ctx.font = '12pt Calibri';
+	ctx.fillStyle = 'white';
+	ctx.fillText(message, 10, 25);
+}
 
 
 function responsiveCanvas(){ 
@@ -208,119 +257,195 @@ function responsiveCanvas(){
     $('#map').attr('height', $('#map').height() ); //max height
 }
 
-function drawMap(context) {
+function drawLines(context) {
 	// Let's create a radial gradient for our lines and circles
-	var gradient = context.createRadialGradient(0, 0, 300, 0, 0, 600);
-	gradient.addColorStop(0, '#2E262F');
-	gradient.addColorStop(1, '#004CB3');
+	var gradient = context.createRadialGradient(0, 0, 600, 0, 0, 1200);
+	gradient.addColorStop(0, '#004CB3');
+	gradient.addColorStop(1, '#000000');
 	context.strokeStyle = gradient;
 	context.lineWidth = 1 / zoomLevel;
 
-	var sectors = 20; // How many segments in our starmap
-	var r = 2600; // How far our should we draw the lines? TODO: Make'em go forever?
+	var sectors = 36; // How many segments in our starmap
+	var r = 2600; // How far our should we draw the lines?
 
 	context.beginPath();
 	for(var i = 1; i <= sectors; i++) {
 		// Draw some pretty lines. Doing it this way is more efficient than drawing all the lines from the edge of the circle, even though this method doubles the number of lines we draw.
-    	var x = r * Math.cos(2 * Math.PI * i / sectors);
-    	var y = r * Math.sin(2 * Math.PI * i / sectors);
+		var x = r * Math.cos(2 * Math.PI * i / sectors);
+		var y = r * Math.sin(2 * Math.PI * i / sectors);
 		context.moveTo(0,0);
 		context.lineTo(x,y);
 	}
 	for (var r = 200; r <= 2000; r+=200) {
-		// Draw some pretty circles		
+		// Draw some pretty circles
 		context.arc(0, 0, r, 0, 2 * Math.PI, false);
 	}
 	context.stroke();
 	context.closePath();
+}
 
+function drawVoronoi(context, mapData) {
 	var rect = canvas.getBoundingClientRect();
-	var topleft = offscreen_context.transformedPoint(0 - rect.left, 0 - rect.top);
-	var bottomright = ctx.transformedPoint(canvas.width, canvas.height);
-	/*console.log('topleft.y',topleft.y);
-	console.log('bottomright.y',bottomright.y);*/
-	
-	$.each(mapData, function(){
+	var topleft = context.transformedPoint(0 - rect.left, 0 - rect.top);
+	var bottomright = context.transformedPoint(canvas.width, canvas.height);
+	if (!cells) {return;}
+	var halfedges, nHalfedges, iHalfedge;
+	var v;
+	for (var cellid in cells) {
+		halfedges = cells[cellid].halfedges;
+		nHalfedges = halfedges.length;
+		if(nHalfedges > 0 && cells[cellid].site.planet.owner.id != 0) { // Assert that we actually have some edges to draw. If not, try again. Who knows, maybe it might work?
+			v = halfedges[0].getStartpoint();
+			context.beginPath();
+			context.moveTo(v.x,-v.y);
+			for (iHalfedge=0; iHalfedge<nHalfedges; iHalfedge++) {
+				v = halfedges[iHalfedge].getEndpoint();
+				context.lineTo(v.x,-v.y);
+			}
+			context.fillStyle=getFactionColor(cells[cellid].site.planet);
+			context.fill();
+		}
+	}
+
+	var currentLogoSize = logoSize * zoomLevel;
+	if(currentLogoSize < 64) currentLogoSize = 64;
+	else if(currentLogoSize > logoSize) currentLogoSize = logoSize;
+	context.globalAlpha = 1 / zoomLevel;
+	$.each(capitals, function(){
+		//console.log(this);
+		var img=document.getElementById("logo" + this.owner.id);
+		if(img) {
+			context.drawImage(img,this.position.x - (currentLogoSize / 2),-this.position.y - (currentLogoSize / 2),currentLogoSize,currentLogoSize);
+		}
+	});
+	//Remember to reset the alpha
+	context.globalAlpha = 1;
+
+	$.each(mapData.cells, function(){
 		// First, let's draw all the planets inside the viewport
 		if(
-			this.position && 
-			this.position.x && 
-			this.position.y && 
-			this.position.x > topleft.x && 
-			this.position.x < bottomright.x && 
-			-this.position.y > topleft.y && 
-			-this.position.y < bottomright.y) {
+			this.site.planet.position &&
+			this.site.planet.position.x &&
+			this.site.planet.position.y &&
+			this.site.planet.position.x > topleft.x &&
+			this.site.planet.position.x < bottomright.x &&
+			-this.site.planet.position.y > topleft.y &&
+			-this.site.planet.position.y < bottomright.y) {
 			context.beginPath();
-			context.arc(this.position.x, -this.position.y, planetRadius, 0, 2 * Math.PI, false);
-			context.fillStyle = getFactionColor(this);
+			context.arc(this.site.planet.position.x, -this.site.planet.position.y, planetRadius, 0, 2 * Math.PI, false);
+			context.fillStyle = getFactionPlanetColor(this.site.planet);
 			context.fill();
 			context.closePath();
-			
+
 			if(this.selected) {
 				context.beginPath();
-				context.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
+				context.arc(this.site.planet.position.x, -this.site.planet.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
 				context.strokeStyle = 'cyan';
-				context.lineWidth = 4;
+				if(this.planet.contested != 0) {
+					var sum = 0;
+					for (var t = 0; t < 8; t++) {
+						var territory = this.territories[t];
+						for (var i = 0; i < 8; i++) {
+							sum += (0x1 & territory);
+							territory = territory >> 1;
+						}
+					}
+					context.lineWidth = sum / 2 + 1;
+				} else {
+					context.lineWidth = 4;
+				}
 				context.stroke();
 				context.closePath();
 			}
-			else if(this.contested != 0) {
-				context.beginPath();
-				context.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
-				context.strokeStyle = 'red';
-				context.lineWidth = 4;
-	      		context.stroke();
-	      		context.closePath();
-      		}/* else if(this.unit.id != 0) { // This planet is owned by a player unit.
-      			ctx.beginPath();
-				ctx.arc(this.position.x, -this.position.y, planetRadius + 4, 0, 2 * Math.PI, false);
-				ctx.strokeStyle = getFactionColor(this);
-				ctx.lineWidth = 4;
-	      		ctx.stroke();
-	      		ctx.closePath();
-      		}*/
-		} else if (this.name === 'Terra'){
-			console.log('not rendering Terra', this);
+		} else if (this.site.planet.name === 'Terra'){
+			//console.log('not rendering Terra', this);
 		}
 	});
+
 	context.font = (fontSize).toFixed(0) + 'px sans-serif';
-    context.fillStyle = 'white';
-    context.strokeStyle = 'black';
+	context.fillStyle = 'white';
+	context.strokeStyle = 'black';
 	context.lineWidth = 0.2;
-	$.each(mapData, function(){
-		// Then, let's draw all planet names inside the viewport
-		if(zoomLevel > 5 && 
-			this.position && 
-			this.position.x && 
-			this.position.y && 
-			this.position.x > parseInt(topleft.x) - 15 && 
-			this.position.x < bottomright.x && 
-			-this.position.y > topleft.y && 
-			-this.position.y < bottomright.y) {
-	        if(this.selected) {
-	        	context.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
-	        }
-	        var planetText = this.name;
-	        if(this.unit.name!==''){
-        		planetText += ' (' + this.unit.name + ')';
-	        }
-	        context.save();
-			context.strokeText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
-			context.fillText(planetText, parseInt(this.position.x) + 3,parseInt(-this.position.y) + 0.5);
-	        context.restore();
-		    if(this.selected) {
-	        	context.font = (fontSize).toFixed(0) + 'px sans-serif';
-	        }
+	context.globalAlpha = (zoomLevel - 4) * 0.5;
+	$.each(mapData.cells, function(){
+		// Then, let's draw all planet names inside the viewport if we are zoomed in enough
+		if(zoomLevel > 4 &&
+			this.site.planet.position &&
+			this.site.planet.position.x &&
+			this.site.planet.position.y &&
+			this.site.planet.position.x > parseInt(topleft.x) - 15 &&
+			this.site.planet.position.x < bottomright.x &&
+			-this.site.planet.position.y > topleft.y &&
+			-this.site.planet.position.y < bottomright.y) {
+			if(this.site.planet.selected) {
+				context.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
+			}
+			var planetText = this.site.planet.name;
+			if(this.site.planet.unit.name!==''){
+				planetText += ' (' + this.site.planet.unit.name + ')';
+			}
+			context.save();
+			context.strokeText(planetText, parseInt(this.site.planet.position.x) + 3,parseInt(-this.site.planet.position.y) + 0.5);
+			context.fillText(planetText, parseInt(this.site.planet.position.x) + 3,parseInt(-this.site.planet.position.y) + 0.5);
+			context.restore();
+			if(this.site.planet.selected) {
+				context.font = (fontSize).toFixed(0) + 'px sans-serif';
+			}
 		}
 	});
+	context.globalAlpha = 1;
 }
 
 function getFactionColor(faction) {
 	var factionID = faction.owner.id;
 	//console.log(faction);
-	if(faction.contested != 0) {
-		return '#ff0000';
+	if(faction.selected){
+		return '#505050';
 	}
+	if(faction.contested != 0) {
+		return '#aa0000';
+	}
+	if(factionID == 0) {
+		return '#000000';
+	} else if(factionID == 1) { // PIRANHA GAMES
+		return '#dddddd';
+	} else if(factionID == 2) { // NONE
+		return '#dddddd';
+	} else if(factionID == 3) { // NONE
+		return '#dddddd';
+	} else if(factionID == 4) { // NONE
+		return '#dddddd';
+	} else if(factionID == 5) { // DAVION
+		return '#222200';
+	} else if(factionID == 6) { // KURITA
+		return '#220404';
+	} else if(factionID == 7) { // LIAO
+		return '#073315';
+	} else if(factionID == 8) { // MARIK
+		return '#111122';
+	} else if(factionID == 9) { // RASALHAGUE
+		return '#112222';
+	} else if(factionID == 10) { // STEINER
+		return '#001122';
+	} else if(factionID == 11) { // SMOKE JAGUAR
+		return '#112211';
+	} else if(factionID == 12) { // JADE FALCON
+		return '#1e3322';
+	} else if(factionID == 13) { // WOLF
+		return '#221e1e';
+	} else if(factionID == 14) { // GHOST BEAR
+		return '#223333';
+	} else if(factionID == 15) { // NONE
+		return '#ffffff';
+	} else return '#ffffff';
+}
+
+function getFactionPlanetColor(faction) {
+	var factionID = faction.owner.id;
+	//console.log(faction);
+	/*if(faction.contested != 0) {
+		return '#aa0000';
+	}*/
 	if(factionID == 0) {
 		return '#ffffff';
 	} else if(factionID == 1) { // PIRANHA GAMES
@@ -354,42 +479,28 @@ function getFactionColor(faction) {
 	} else if(factionID == 15) { // NONE
 		return '#ffffff';
 	} else return '#ffffff';
-
 }
 
 function trackHoverPlanet(mousePos) {
-    var hoveringOverAPLanet = false;
-    $.each(mapData, function(){
-        if(this.position && this.position.x && this.position.y) {
-	        if (pointInCircle(mousePos, this)) {
-	        	//TODO: Replace with get closest planet that also is in circle so we avoid double hits.
-	            this.selected = true;
-	            console.log(this.name + ' ('+this.position.x+','+this.position.y+')');
-	            hoveringOverAPLanet = true;
-	            if(selectedPlanet.name) {
-	            	if(selectedPlanet.name !== this.name){
-						selectedPlanet = this;
-						showDetails(selectedPlanet);
-					}
-				} else {
-					selectedPlanet = this;
-					showDetails(selectedPlanet);
-				}
-	            return;
+	//console.log(mousePos, mapData);
+	var hoveringOverAPLanet = false;
+    $.each(mapData.cells, function(index){
+        if(this.site.planet.position && this.site.planet.position.x && this.site.planet.position.y) {
+			if (pointInCell(mousePos, this) && !hoveringOverAPLanet) {
+	            this.site.planet.selected = true;
+				hoveringOverAPLanet = index;
 	        } else {
-	        	this.selected = false;
+	        	this.site.planet.selected = false;
 	        }
 	    }
     });
     return hoveringOverAPLanet;
 }
 
-function pointInCircle(point, shape) {
-	//Is some point within some radius?
-    var distX = Math.abs(point.x - shape.position.x),
-        distY = Math.abs(point.y - -shape.position.y), // Coordinates are y-inverted on a canvas, so we multiply all values in the y-axis with -1
-        dist = Math.sqrt(distX * distX + distY * distY);
-    return dist < planetRadius * 2;
+function pointInCell(point, cell) {
+	if (cell.pointIntersection(point.x,-point.y) > 0) {
+		return true
+	} else return false;
 }
 
 function showDetails (planet){
@@ -419,9 +530,9 @@ function showDetails (planet){
 				territory = territory >> 1;
 			}
 		}
-		$('#planetinvaderterritoriesowned').text(sum);
+		$('#planetinvaderterritoriesowned').children('.progress-bar').css('width',sum * 100 / 12+ '%').text(sum);
 	} else {
-		$('#planetinvaderterritoriesowned').text('0');
+		$('#planetinvaderterritoriesowned').children('.progress-bar').css('width','0%').text(0);
 	}
 	
 }

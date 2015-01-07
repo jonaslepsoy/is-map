@@ -1,34 +1,52 @@
 extends layout
 
 block content
-	div.row
-		div.col-xs-12.header
-			h1
-				= title
-				| 
-				span.label.label-info Beta
-	div.row
-		article.col-xs-12.col-md-8.main
-			canvas#map
-			img.loading-animation(src='images/loading.gif')
-			div#date
-		aside.col-md-4.sidebar
-			div.panel.panel-default
-				div.panel-heading
-					h3.panel-title#planetname
-				div.panel-body
-					div.col-xs-12
-						img#planetownerimage.factionicon.col-xs-4
-						div.col-xs-8
-							| Owner: 
-							span#planetowner
-							div#planetownerunit
-					hr.planetdivider.col-xs-12
-					div.col-xs-12
-						img#planetinvaderimage.factionicon.col-xs-4
-						div.col-xs-8
-							| Invader: 
-							span#planetinvader
-							div
-								| Territories taken: 
-								span#planetinvaderterritoriesowned
+    a(href="https://github.com/jonaslepsoy/is-map")
+        img(style="position: absolute; z-index: 1; top: 0; right: 0; border: 0;",src="images/fork-me.png",alt="Fork me on GitHub")
+    div.row
+        div.col-xs-12.header
+            h1
+                = title
+                | &nbsp;
+                span.label.label-info Beta
+    div.row
+        article.col-xs-12.col-md-8.main
+            canvas#map
+            img.loading-animation(src='images/loading.gif')
+            div#date
+            div
+                | Logos by&nbsp;
+                a(href='http://punakettu.deviantart.com/')
+                    | Punakettu
+            div#logos.hide
+                img#logo5(src='images/davionlogo.png')
+                img#logo6(src='images/kuritalogo.png')
+                img#logo7(src='images/liaologo.png')
+                img#logo8(src='images/mariklogo.png')
+                img#logo9(src='images/rasalhaguelogo.png')
+                img#logo10(src='images/steinerlogo.png')
+                img#logo11(src='images/clansmokejaguarlogo.png')
+                img#logo12(src='images/clanjadefalconlogo.png')
+                img#logo13(src='images/clanwolflogo.png')
+                img#logo14(src='images/clanghostbearlogo.png')
+        aside.col-md-4.sidebar
+            div.panel.panel-default
+                div.panel-heading
+                    h3.panel-title#planetname
+                div.panel-body
+                    div.col-xs-12
+                        img#planetownerimage.factionicon.col-xs-4
+                        div.col-xs-8
+                            | Owner:&nbsp;
+                            span#planetowner
+                            div#planetownerunit
+                    hr.planetdivider.col-xs-12
+                    div.col-xs-12
+                        img#planetinvaderimage.factionicon.col-xs-4
+                        div.col-xs-8
+                            | Invader:&nbsp;
+                            span#planetinvader
+                            div
+                                | Territories taken:
+                                div.progress#planetinvaderterritoriesowned
+                                    div.progress-bar(role="progressbar")
