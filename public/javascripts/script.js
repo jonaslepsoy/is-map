@@ -32,8 +32,7 @@ $(document).ready(function(){
 	trackTransforms(ctx);
 	trackTransforms(offscreen_context);
 
-	getMapData('json/mapdata.json'); // For easier development...
-	//getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
+	getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
 
 	initCanvas();
 })
