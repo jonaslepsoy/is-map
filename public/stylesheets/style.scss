@@ -68,3 +68,15 @@ hr.planetdivider {
     margin-bottom:50px;
   }
 }
+
+nav.navbar.navbar-fixed-bottom{
+  z-index:1031;
+  .navbar-text {
+    padding-left:15px;
+    padding-right:15px;
+  }
+}
+
+.mwologo {
+  height:20px;
+}
