@@ -2,6 +2,18 @@ a {
   color: #00B7FF;
 }
 
+.header {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
+
+#canvas-container {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
 canvas {
   width: 100%;
   height: 100%;
@@ -27,4 +39,29 @@ hr.planetdivider {
   width: 90%;
   /* Older browsers */
   width: calc(100% - 30px);
+}
+
+.main {
+  z-index: 1;
+}
+
+.fork {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  border: 0;
+}
+
+@media (max-width: 767px) {
+  aside.navbar-fixed-bottom {
+    margin-bottom: 30px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+@media (min-width: 768px) {
+  aside.navbar-fixed-bottom {
+    margin-bottom: 50px;
+  }
 }

@@ -1,117 +1,117 @@
 var mapData, canvas, ctx;
 var dragStart,dragged;
+var lastX, lastY;
 var mousePos = {x:0,y:0};
 var zoomLevel = 0.5;
 var fontSize = 1.2;
 var initialPlanetRadius = 1
 var planetRadius = initialPlanetRadius / zoomLevel;
-var selectedPlanet = {};
 var offscreen_canvas, offscreen_context;
-var logo_canvas, logo_context;
 var sites = [];
 var cells = null;
 var bbox = {xl:-1000, xr:1000, yt:-1000, yb:1000};
 var logoSize = 64;
 var capitals = [];
-var treemap;
+var scaleFactor = 1.1;
+
 
 $(document).ready(function(){
 	
 	canvas = document.getElementById('map');
 	ctx = canvas.getContext('2d');
-	responsiveCanvas();
+	$('#map').attr('width', $('#map').width() ); //max width
+	$('#map').attr('height', $('#map').height() ); //max height
 	offscreen_canvas = document.createElement('canvas');
 	offscreen_canvas.width = canvas.width;
 	offscreen_canvas.height = canvas.height;
 	offscreen_context = offscreen_canvas.getContext('2d');
 
-	$(window).resize( function () {
-		responsiveCanvas();
-		offscreen_canvas.width = canvas.width;
-		offscreen_canvas.height = canvas.height;
-	});
+	$(window).resize(responsiveCanvas);
+	responsiveCanvas();
 
 	trackTransforms(ctx);
 	trackTransforms(offscreen_context);
 
-	//getMapData('json/mapdata.json'); // For easier development...
-	getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
+	getMapData('json/mapdata.json'); // For easier development...
+	//getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
 
-    //Initial viewport
+	initCanvas();
+})
+
+function initCanvas(){
+	//Initial viewport
 	offscreen_context.translate(canvas.width / 2,canvas.height / 2);
 	offscreen_context.scale(zoomLevel,zoomLevel);
 
 	drawLines(offscreen_context);
 
-    var lastX=canvas.width/2, lastY=canvas.height/2;
+	lastX=canvas.width/2, lastY=canvas.height/2;
 
-    canvas.addEventListener('mousedown',function(evt){
-        document.body.style.mozUserSelect = document.body.style.webkitUserSelect = document.body.style.userSelect = 'none';
-        lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
-        lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
-        dragStart = offscreen_context.transformedPoint(lastX,lastY);
-        dragged = false;
-    },false);
+	canvas.addEventListener('mousedown',function(evt){
+		document.body.style.mozUserSelect = document.body.style.webkitUserSelect = document.body.style.userSelect = 'none';
+		lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
+		lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
+		dragStart = offscreen_context.transformedPoint(lastX,lastY);
+		dragged = false;
+	},false);
 
-    canvas.addEventListener('mousemove',function(evt){
-        if(mapData) {
+	canvas.addEventListener('mousemove',function(evt){
+		if(mapData) {
 			var hovercell = getMousePos(canvas,evt);
-        	if(hovercell) {
+			if(hovercell) {
 				redraw(mapData); // Only redraw if needed (User is mousing over a planet)
 				showDetails(mapData.cells[hovercell].site.planet);
-        	};
-	        lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
-	        lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
-	        dragged = true;
-	        if (dragStart){
-	            var pt = offscreen_context.transformedPoint(lastX,lastY);
-	            offscreen_context.translate(pt.x-dragStart.x,pt.y-dragStart.y);
-	            redraw(mapData);
-	        }
-	    }
-    },false);
-
-    canvas.addEventListener('mouseup',function(evt){
-        dragStart = null;
-        if (!dragged) zoom(evt.shiftKey ? -1 : 1 );
-    },false);
-
-    var scaleFactor = 1.1;
-
-    var zoom = function(clicks){
-        var pt = offscreen_context.transformedPoint(lastX,lastY);
-        offscreen_context.translate(pt.x,pt.y);
-        var factor = Math.pow(scaleFactor,clicks);
-        zoomLevel = offscreen_context.getTransform().a;
-        if(zoomLevel > 1) {
-			planetRadius = initialPlanetRadius;
-		} else {
-			planetRadius = initialPlanetRadius / zoomLevel;
+			};
+			lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
+			lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
+			dragged = true;
+			if (dragStart){
+				var pt = offscreen_context.transformedPoint(lastX,lastY);
+				offscreen_context.translate(pt.x-dragStart.x,pt.y-dragStart.y);
+				redraw(mapData);
+			}
 		}
-        offscreen_context.scale(factor,factor);
-        offscreen_context.translate(-pt.x,-pt.y);
-        redraw(mapData);
-    }
+	},false);
 
-    var handleScroll = function(evt){
-        var delta = evt.wheelDelta ? evt.wheelDelta/40 : evt.detail ? -evt.detail : 0;
-        if (delta){
-    		if(zoomLevel > 0.4 || delta > 0) {
-        		zoom(delta);
-        	}
-        } 
-        return evt.preventDefault() && false;
-    };
+	canvas.addEventListener('mouseup',function(evt){
+		dragStart = null;
+		if (!dragged) zoom(evt.shiftKey ? -1 : 1 );
+	},false);
 
-    function getMousePos(canvas, evt) {
-		var rect = canvas.getBoundingClientRect();
-		mousePos = offscreen_context.transformedPoint(evt.clientX - rect.left, evt.clientY - rect.top);
-		return trackHoverPlanet(mousePos);
+	canvas.addEventListener('DOMMouseScroll',handleScroll,false);
+	canvas.addEventListener('mousewheel',handleScroll,false);
+}
+
+function zoom (clicks){
+	var pt = offscreen_context.transformedPoint(lastX,lastY);
+	offscreen_context.translate(pt.x,pt.y);
+	var factor = Math.pow(scaleFactor,clicks);
+	zoomLevel = offscreen_context.getTransform().a;
+	if(zoomLevel > 1) {
+		planetRadius = initialPlanetRadius;
+	} else {
+		planetRadius = initialPlanetRadius / zoomLevel;
 	}
+	offscreen_context.scale(factor,factor);
+	offscreen_context.translate(-pt.x,-pt.y);
+	redraw(mapData);
+}
 
-    canvas.addEventListener('DOMMouseScroll',handleScroll,false);
-    canvas.addEventListener('mousewheel',handleScroll,false);
-})
+function handleScroll (evt){
+	var delta = evt.wheelDelta ? evt.wheelDelta/40 : evt.detail ? -evt.detail : 0;
+	if (delta){
+		if(zoomLevel > 0.4 || delta > 0) {
+			zoom(delta);
+		}
+	}
+	return evt.preventDefault() && false;
+};
+
+function getMousePos(canvas, evt) {
+	var rect = canvas.getBoundingClientRect();
+	mousePos = offscreen_context.transformedPoint(evt.clientX - rect.left, evt.clientY - rect.top);
+	return trackHoverPlanet(mousePos);
+}
 
 function redraw(mapData){
     // Clear the entire canvas
@@ -255,6 +255,7 @@ function writeMousePosition() {
 function responsiveCanvas(){ 
     $('#map').attr('width', $('#map').width() ); //max width
     $('#map').attr('height', $('#map').height() ); //max height
+	redraw(mapData);
 }
 
 function drawLines(context) {
