@@ -6,6 +6,7 @@ var zoomLevel = 0.5;
 var fontSize = 1.2;
 var initialPlanetRadius = 1
 var planetRadius = initialPlanetRadius / zoomLevel;
+var lastSelectedPlanet;
 var offscreen_canvas, offscreen_context;
 var sites = [];
 var cells = null;
@@ -84,18 +85,23 @@ function initCanvas(){
 
 	canvas.addEventListener('mousemove',function(evt){
 		if(mapData) {
+			var reasonForRedraw = false;
 			var hovercell = getMousePos(canvas,evt);
-			if(hovercell) {
-				redraw(mapData); // Only redraw if needed (User is mousing over a planet)
+			if(!(hovercell === lastSelectedPlanet)){
+				lastSelectedPlanet = hovercell;
+				reasonForRedraw = true;
 				showDetails(mapData.cells[hovercell].site.planet);
-			};
+			}
 			lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
 			lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
 			dragged = true;
 			if (dragStart){
+				reasonForRedraw = true;
 				var pt = offscreen_context.transformedPoint(lastX,lastY);
 				offscreen_context.translate(pt.x-dragStart.x,pt.y-dragStart.y);
-				redraw(mapData);
+			}
+			if(reasonForRedraw) {
+				redraw(mapData); // Only redraw if needed (User is mousing over a planet or dragging the map)
 			}
 		}
 	},false);
@@ -113,19 +119,21 @@ function zoom (clicks){
 	var pt = offscreen_context.transformedPoint(lastX,lastY);
 	offscreen_context.translate(pt.x,pt.y);
 	var factor = Math.pow(scaleFactor,clicks);
+	offscreen_context.scale(factor,factor);
+	offscreen_context.translate(-pt.x,-pt.y);
 	zoomLevel = offscreen_context.getTransform().a;
 	if(zoomLevel > 1) {
 		planetRadius = initialPlanetRadius;
 	} else {
 		planetRadius = initialPlanetRadius / zoomLevel;
 	}
-	offscreen_context.scale(factor,factor);
-	offscreen_context.translate(-pt.x,-pt.y);
 	redraw(mapData);
 }
 
 function handleScroll (evt){
 	var delta = evt.wheelDelta ? evt.wheelDelta/40 : evt.detail ? -evt.detail : 0;
+	if(delta > 1) delta = 1;
+	if(delta < -1) delta = -1;
 	if (delta){
 		if(zoomLevel > 0.4 || delta > 0) {
 			zoom(delta);
@@ -141,6 +149,7 @@ function getMousePos(canvas, evt) {
 }
 
 function redraw(mapData){
+	console.log('redrawing');
     // Clear the entire canvas
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
