@@ -397,38 +397,39 @@ function drawVoronoi(context, mapData) {
 		}
 	});
 
-	context.font = (fontSize).toFixed(0) + 'px sans-serif';
-	context.fillStyle = 'white';
-	context.strokeStyle = 'black';
-	context.lineWidth = 0.2;
-	context.globalAlpha = (zoomLevel - 4) * 0.5;
-	$.each(mapData.cells, function(){
-		// Then, let's draw all planet names inside the viewport if we are zoomed in enough
-		if(zoomLevel > 4 &&
-			this.site.planet.position &&
-			this.site.planet.position.x &&
-			this.site.planet.position.y &&
-			this.site.planet.position.x > parseInt(topleft.x) - 15 &&
-			this.site.planet.position.x < bottomright.x &&
-			-this.site.planet.position.y > topleft.y &&
-			-this.site.planet.position.y < bottomright.y) {
-			if(this.site.planet.selected) {
-				context.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
+	if(zoomLevel > 4){
+		context.font = (fontSize).toFixed(0) + 'px sans-serif';
+		context.fillStyle = 'white';
+		context.strokeStyle = 'black';
+		context.lineWidth = 0.2;
+		context.globalAlpha = (zoomLevel - 4) * 0.5;
+		$.each(mapData.cells, function(){
+			// Then, let's draw all planet names inside the viewport if we are zoomed in enough
+			if(this.site.planet.position &&
+				this.site.planet.position.x &&
+				this.site.planet.position.y &&
+				this.site.planet.position.x > parseInt(topleft.x) - 15 &&
+				this.site.planet.position.x < bottomright.x &&
+				-this.site.planet.position.y > topleft.y &&
+				-this.site.planet.position.y < bottomright.y) {
+				if(this.site.planet.selected) {
+					context.font = (fontSize * 2).toFixed(0) + 'px sans-serif';
+				}
+				var planetText = this.site.planet.name;
+				if(this.site.planet.unit.name!==''){
+					planetText += ' (' + this.site.planet.unit.name + ')';
+				}
+				context.save();
+				context.strokeText(planetText, parseInt(this.site.planet.position.x) + 3,parseInt(-this.site.planet.position.y) + 0.5);
+				context.fillText(planetText, parseInt(this.site.planet.position.x) + 3,parseInt(-this.site.planet.position.y) + 0.5);
+				context.restore();
+				if(this.site.planet.selected) {
+					context.font = (fontSize).toFixed(0) + 'px sans-serif';
+				}
 			}
-			var planetText = this.site.planet.name;
-			if(this.site.planet.unit.name!==''){
-				planetText += ' (' + this.site.planet.unit.name + ')';
-			}
-			context.save();
-			context.strokeText(planetText, parseInt(this.site.planet.position.x) + 3,parseInt(-this.site.planet.position.y) + 0.5);
-			context.fillText(planetText, parseInt(this.site.planet.position.x) + 3,parseInt(-this.site.planet.position.y) + 0.5);
-			context.restore();
-			if(this.site.planet.selected) {
-				context.font = (fontSize).toFixed(0) + 'px sans-serif';
-			}
-		}
-	});
-	context.globalAlpha = 1;
+		});
+		context.globalAlpha = 1;
+	}
 }
 
 function trackHoverPlanet(mousePos) {
