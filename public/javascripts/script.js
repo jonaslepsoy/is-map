@@ -13,6 +13,34 @@ var bbox = {xl:-1000, xr:1000, yt:-1000, yb:1000};
 var logoSize = 64;
 var capitals = [];
 var scaleFactor = 1.1;
+var factionColor = [];
+var factionPlanetColor = [];
+
+factionColor['selected'] = '#505050';
+factionColor['contested'] = '#aa0000';
+factionColor[0] =' #000000';
+factionColor[5] =' #222200';
+factionColor[6] =' #220404';
+factionColor[7] =' #073315';
+factionColor[8] =' #111122';
+factionColor[9] =' #112222';
+factionColor[10] =' #001122';
+factionColor[11] =' #112211';
+factionColor[12] =' #1e3322';
+factionColor[13] =' #223333';
+factionColor[14] =' #223333';
+
+factionPlanetColor[0] = '#ffffff';
+factionPlanetColor[5] = '#ffff33';
+factionPlanetColor[6] = '#ff3300';
+factionPlanetColor[7] = '#005000';
+factionPlanetColor[8] = '#cc00cc';
+factionPlanetColor[9] = '#00ccff';
+factionPlanetColor[10] = '#0033cc';
+factionPlanetColor[11] = '#707070';
+factionPlanetColor[12] = '#00cc33';
+factionPlanetColor[13] = '#cc0000';
+factionPlanetColor[14] = '#3399ff';
 
 
 $(document).ready(function(){
@@ -302,7 +330,14 @@ function drawVoronoi(context, mapData) {
 				v = halfedges[iHalfedge].getEndpoint();
 				context.lineTo(v.x,-v.y);
 			}
-			context.fillStyle=getFactionColor(cells[cellid].site.planet);
+			//console.log(cells[cellid].site.planet);
+			if(cells[cellid].site.planet.selected) {
+				context.fillStyle=factionColor['selected'];
+			} else if(cells[cellid].site.planet.contested!=='0') {
+				context.fillStyle=factionColor['contested'];
+			} else {
+				context.fillStyle=factionColor[cells[cellid].site.planet.owner.id];
+			}
 			context.fill();
 		}
 	}
@@ -333,7 +368,7 @@ function drawVoronoi(context, mapData) {
 			-this.site.planet.position.y < bottomright.y) {
 			context.beginPath();
 			context.arc(this.site.planet.position.x, -this.site.planet.position.y, planetRadius, 0, 2 * Math.PI, false);
-			context.fillStyle = getFactionPlanetColor(this.site.planet);
+			context.fillStyle = factionPlanetColor[this.site.planet.owner.id];
 			context.fill();
 			context.closePath();
 
@@ -394,91 +429,6 @@ function drawVoronoi(context, mapData) {
 		}
 	});
 	context.globalAlpha = 1;
-}
-
-function getFactionColor(faction) {
-	var factionID = faction.owner.id;
-	//console.log(faction);
-	if(faction.selected){
-		return '#505050';
-	}
-	if(faction.contested != 0) {
-		return '#aa0000';
-	}
-	if(factionID == 0) {
-		return '#000000';
-	} else if(factionID == 1) { // PIRANHA GAMES
-		return '#dddddd';
-	} else if(factionID == 2) { // NONE
-		return '#dddddd';
-	} else if(factionID == 3) { // NONE
-		return '#dddddd';
-	} else if(factionID == 4) { // NONE
-		return '#dddddd';
-	} else if(factionID == 5) { // DAVION
-		return '#222200';
-	} else if(factionID == 6) { // KURITA
-		return '#220404';
-	} else if(factionID == 7) { // LIAO
-		return '#073315';
-	} else if(factionID == 8) { // MARIK
-		return '#111122';
-	} else if(factionID == 9) { // RASALHAGUE
-		return '#112222';
-	} else if(factionID == 10) { // STEINER
-		return '#001122';
-	} else if(factionID == 11) { // SMOKE JAGUAR
-		return '#112211';
-	} else if(factionID == 12) { // JADE FALCON
-		return '#1e3322';
-	} else if(factionID == 13) { // WOLF
-		return '#221e1e';
-	} else if(factionID == 14) { // GHOST BEAR
-		return '#223333';
-	} else if(factionID == 15) { // NONE
-		return '#ffffff';
-	} else return '#ffffff';
-}
-
-function getFactionPlanetColor(faction) {
-	var factionID = faction.owner.id;
-	//console.log(faction);
-	/*if(faction.contested != 0) {
-		return '#aa0000';
-	}*/
-	if(factionID == 0) {
-		return '#ffffff';
-	} else if(factionID == 1) { // PIRANHA GAMES
-		return '#ffffff';
-	} else if(factionID == 2) { // NONE
-		return '#ffffff';
-	} else if(factionID == 3) { // NONE
-		return '#ffffff';
-	} else if(factionID == 4) { // NONE
-		return '#ffffff';
-	} else if(factionID == 5) { // DAVION
-		return '#ffff33';
-	} else if(factionID == 6) { // KURITA
-		return '#ff3300';
-	} else if(factionID == 7) { // LIAO
-		return '#005000';
-	} else if(factionID == 8) { // MARIK
-		return '#cc00cc';
-	} else if(factionID == 9) { // RASALHAGUE
-		return '#00ccff';
-	} else if(factionID == 10) { // STEINER
-		return '#0033cc';
-	} else if(factionID == 11) { // SMOKE JAGUAR
-		return '#707070';
-	} else if(factionID == 12) { // JADE FALCON
-		return '#00cc33';
-	} else if(factionID == 13) { // WOLF
-		return '#cc0000';
-	} else if(factionID == 14) { // GHOST BEAR
-		return '#3399ff';
-	} else if(factionID == 15) { // NONE
-		return '#ffffff';
-	} else return '#ffffff';
 }
 
 function trackHoverPlanet(mousePos) {
