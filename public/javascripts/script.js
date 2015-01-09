@@ -132,8 +132,8 @@ function zoom (clicks){
 
 function handleScroll (evt){
 	var delta = evt.wheelDelta ? evt.wheelDelta/40 : evt.detail ? -evt.detail : 0;
-	if(delta > 1) delta = 1;
-	if(delta < -1) delta = -1;
+	/*if(delta > 1) delta = 1;
+	if(delta < -1) delta = -1;*/
 	if (delta){
 		if(zoomLevel > 0.4 || delta > 0) {
 			zoom(delta);
