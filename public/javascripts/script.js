@@ -16,6 +16,7 @@ var capitals = [];
 var scaleFactor = 1.1;
 var factionColor = [];
 var factionPlanetColor = [];
+var lastScale = null;
 
 factionColor['selected'] = '#505050';
 factionColor['contested'] = '#aa0000';
@@ -117,17 +118,17 @@ function initCanvas(){
 	canvas.addEventListener('mousewheel',handleScroll,false);
 
 	// Set up touch listeners
-	var hammertime = new Hammer(canvas);
+	var mc = new Hammer.Manager(document.getElementById('canvas-container'));
 
-	hammertime.on('pan', function(evt) {
+	// create a pinch recognizer
+	var pinch = new Hammer.Pinch();
+	
+	// add to the Manager
+	mc.add([pinch]);
+
+	mc.on('pan', function(evt) {
 		if(mapData) {
 			var reasonForRedraw = false;
-			/*var hovercell = getMousePos(canvas,evt);
-			 if(!(hovercell === lastSelectedPlanet)){
-			 lastSelectedPlanet = hovercell;
-			 reasonForRedraw = true;
-			 showDetails(mapData.cells[hovercell].site.planet);
-			 }*/
 			lastX = evt.pointers[0].clientX;
 			lastY = evt.pointers[0].clientY;
 
@@ -144,16 +145,46 @@ function initCanvas(){
 		}
 	});
 
-	hammertime.on('panstart', function(evt) {
+	mc.on('panstart', function(evt) {
 		lastX = evt.pointers[0].clientX;
 		lastY = evt.pointers[0].clientY;
 		dragStart = offscreen_context.transformedPoint(lastX,lastY);
 		dragged = false;
 	});
 
-	hammertime.on('panstart', function(evt) {
-		lastX = evt.pointers[0].clientX;
-		lastY = evt.pointers[0].clientY;
+
+	mc.on("pinch", function(evt) {
+	    //$('#debug').html(JSON.stringify(Object.keys(evt)) + ' ' + evt.center.x + ',' + evt.center.y + ' final: ' + evt.isFinal);
+	    evt.preventDefault();
+	    var delta = 0;
+
+	    if(lastScale !== null) {
+    		// User is scaling with fingers
+    		delta =  evt.scale - lastScale;
+	    } else {
+    		delta = 0;
+	    }
+
+	    lastScale = evt.scale;
+
+	    if(evt.isFinal) {
+	    	lastScale = null;
+	    }
+
+	    
+	    var pt = offscreen_context.transformedPoint(evt.center.x,evt.center.y);
+		offscreen_context.translate(pt.x,pt.y);
+		var factor = Math.pow(scaleFactor,delta * 15);
+		offscreen_context.scale(factor,factor);
+		offscreen_context.translate(-pt.x,-pt.y);
+		zoomLevel = offscreen_context.getTransform().a;
+		if(zoomLevel > 1) {
+			planetRadius = initialPlanetRadius;
+		} else {
+			planetRadius = initialPlanetRadius / zoomLevel;
+		}
+		redraw(mapData);
+	    
 	});
 }
 
