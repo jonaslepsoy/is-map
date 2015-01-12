@@ -61,7 +61,8 @@ $(document).ready(function(){
 	trackTransforms(ctx);
 	trackTransforms(offscreen_context);
 
-	getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
+	getMapData('json/mapdata.json');
+	//getMapData('https://static.mwomercs.com/data/cw/mapdata.json');
 
 	initCanvas();
 })
@@ -94,6 +95,7 @@ function initCanvas(){
 			}
 			lastX = evt.offsetX || (evt.pageX - canvas.offsetLeft);
 			lastY = evt.offsetY || (evt.pageY - canvas.offsetTop);
+			console.log(lastX+','+lastY);
 			dragged = true;
 			if (dragStart){
 				reasonForRedraw = true;
@@ -113,6 +115,46 @@ function initCanvas(){
 
 	canvas.addEventListener('DOMMouseScroll',handleScroll,false);
 	canvas.addEventListener('mousewheel',handleScroll,false);
+
+	// Set up touch listeners
+	var hammertime = new Hammer(canvas);
+
+	hammertime.on('pan', function(evt) {
+		if(mapData) {
+			var reasonForRedraw = false;
+			/*var hovercell = getMousePos(canvas,evt);
+			 if(!(hovercell === lastSelectedPlanet)){
+			 lastSelectedPlanet = hovercell;
+			 reasonForRedraw = true;
+			 showDetails(mapData.cells[hovercell].site.planet);
+			 }*/
+			lastX = evt.pointers[0].clientX;
+			lastY = evt.pointers[0].clientY;
+
+			dragged = true;
+			if (dragStart){
+				reasonForRedraw = true;
+				var pt = offscreen_context.transformedPoint(lastX,lastY);
+				offscreen_context.translate(pt.x-dragStart.x,pt.y-dragStart.y);
+			}
+
+			if(reasonForRedraw) {
+				redraw(mapData);
+			}
+		}
+	});
+
+	hammertime.on('panstart', function(evt) {
+		lastX = evt.pointers[0].clientX;
+		lastY = evt.pointers[0].clientY;
+		dragStart = offscreen_context.transformedPoint(lastX,lastY);
+		dragged = false;
+	});
+
+	hammertime.on('panstart', function(evt) {
+		lastX = evt.pointers[0].clientX;
+		lastY = evt.pointers[0].clientY;
+	});
 }
 
 function zoom (clicks){
