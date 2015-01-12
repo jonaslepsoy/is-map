@@ -149,7 +149,6 @@ function getMousePos(canvas, evt) {
 }
 
 function redraw(mapData){
-	console.log('redrawing');
     // Clear the entire canvas
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
